@@ -1,0 +1,14 @@
+@RELATION attribute_metadata
+
+@ATTRIBUTE relation_name STRING
+@ATTRIBUTE attribute_name STRING
+@ATTRIBUTE domain_type STRING
+
+@DATA
+students,student_id,string
+students,full_name,string
+students,phone_number,string
+students,age,integer
+students,university,string
+universities,university_id,string
+universities,city,string

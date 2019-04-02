@@ -1,0 +1,9 @@
+@RELATION foreign_key_metadata
+
+@ATTRIBUTE relation STRING
+@ATTRIBUTE attribute STRING
+@ATTRIBUTE foreign_key STRING
+@ATTRIBUTE foreign_key_table STRING
+
+@DATA
+students,university,university_id,universities

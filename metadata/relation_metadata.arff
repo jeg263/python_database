@@ -1,0 +1,9 @@
+@RELATION relation_metadata
+
+@ATTRIBUTE relation_name STRING
+@ATTRIBUTE location STRING
+@ATTRIBUTE primary_key STRING
+
+@DATA
+students,./data/students,student_id
+universities,./data/universities,university_id

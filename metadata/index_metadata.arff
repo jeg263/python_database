@@ -1,0 +1,10 @@
+@RELATION index_metadata
+
+@ATTRIBUTE index_name STRING
+@ATTRIBUTE relation_name STRING
+@ATTRIBUTE index_type STRING
+@ATTRIBUTE index_attributes STRING
+
+@DATA
+index_students_student_id_primary_key,students,type,student_id
+index_universities_university_id_primary_key,universities,type,university_id
