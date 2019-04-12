@@ -1,6 +1,6 @@
-import arff
 import os
-from errors import *
+import arff
+from db.errors import *
 
 
 class Metadata:
@@ -14,8 +14,25 @@ class Metadata:
         self._index_md = []
         self._foreign_key_md = []
 
+        self._relations = {}
+
         self._load_md_into_memory()
         self._save_metadata()
+
+    def get_relations(self):
+        self._build_relations_info()
+        return self._relations
+
+    def _build_relations_info(self):
+        for rel in self._relation_md:
+            relation = rel[0]
+
+            attributes = []
+            for abute in self._attribute_md:
+                if abute[0] == relation:
+                    attributes.append({"name": abute[1], "domain": abute[2]})
+
+            self._relations[relation] = {'attributes': attributes, 'location': rel[1], 'primary_key': rel[2]}
 
     def _load_md_into_memory(self):
         if os.path.isfile(self._relation_metadata_fp):
@@ -216,6 +233,7 @@ class Metadata:
     def _add_foreign_key(self, relation, attribute, foreign_key, foreign_key_table):
         self._foreign_key_md.append([relation, attribute, foreign_key, foreign_key_table])
 
+
 # # Impossible foreign keys
 # # Table already exists
 # metadata.add_indexes("students", ["student_id_primary_key"], ["type"], ["student_id"])
@@ -247,3 +265,4 @@ class Metadata:
 # # #
 # # #
 # # f.close()
+
