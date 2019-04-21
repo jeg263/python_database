@@ -7,3 +7,7 @@
 @DATA
 students,./data/students,student_id
 universities,./data/universities,university_id
+A,./data/A,id
+B,./data/B,id
+C,./data/C,id
+D,./data/D,id

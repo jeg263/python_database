@@ -12,3 +12,13 @@ students,age,integer
 students,university,string
 universities,university_id,string
 universities,city,string
+A,id,string
+A,value,string
+B,id,string
+B,value,string
+B,value2,string
+B,value3,string
+C,id,string
+C,value,string
+D,id,string
+D,value,string

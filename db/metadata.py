@@ -23,6 +23,9 @@ class Metadata:
         self._build_relations_info()
         return self._relations
 
+    def get_indexes(self):
+        return self._index_md
+
     def _build_relations_info(self):
         for rel in self._relation_md:
             relation = rel[0]

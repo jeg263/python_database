@@ -1,6 +1,8 @@
 class Error(Exception):
     pass
 
+class SQLInputError(Error):
+    pass
 
 class DuplicateFK(Error):
     pass

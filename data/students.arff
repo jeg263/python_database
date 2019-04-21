@@ -1,0 +1,12 @@
+@RELATION students
+
+@ATTRIBUTE student_id STRING
+@ATTRIBUTE full_name STRING
+@ATTRIBUTE phone_number STRING
+@ATTRIBUTE age NUMERIC
+@ATTRIBUTE university STRING
+
+@DATA
+25,?,?,?,61
+10,?,?,?,24
+24,?,?,?,24
