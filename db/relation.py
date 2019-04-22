@@ -4,77 +4,7 @@ import os
 import arff
 from .index import Index, IndexSet
 import copy
-
-
-class Tuple:
-    def __init__(self, primary_key, attributes, values, split_abutes=True):
-        self._data = []
-        self._primary_key = primary_key
-        # self._attributes = {}
-        # self._domains = {}
-        #
-        if split_abutes:
-        #     i = 0
-        #     for abute in attributes:
-        #         self._attributes[abute['name']] = i
-        #         self._domains[abute['name']] = abute['domain']
-        #         i += 1
-            for value in values:
-                self._data.append(value['value'])
-        else:
-        #     self._attributes = attributes
-            self._data = values
-
-    def get_value_for_index(self, i):
-        return self._data[i]
-
-    def _get_data(self):
-        return self._data
-
-    def merge(self, new_tuple):
-        abutes = {}
-        # abutes = copy.deepcopy(self._attributes).update(new_tuple.get_attributes())
-        new_data = self._data + new_tuple._get_data()
-        return Tuple(self._primary_key, abutes, new_data, False)
-
-    # def set_attributes(self, abutes):
-    #     self._attributes = abutes
-
-    # def get_attributes(self):
-    #     return self._attributes
-
-    def print(self):
-        for d in self._data:
-            if d is None:
-                print("? ", end='')
-            else:
-                print(str(d) + " ", end='')
-
-    # def value_for_attribute(self, attribute):
-    #     if attribute not in self._attributes.keys():
-    #         return None
-    #     return self._data[self._attributes[attribute]]
-
-    def get_primary_key(self):
-        return self._primary_key
-
-    def __lt__(self, other):
-        return self._primary_key < other.get_primary_key()
-
-    def __le__(self, other):
-        return self._primary_key <= other.get_primary_key()
-    # def  __eq__(self, other):
-    #
-    # def  __ne__(self, other):
-
-    def __gt__(self, other):
-        return self._primary_key > other.get_primary_key()
-
-    def __ge__(self, other):
-        return self._primary_key >= other.get_primary_key()
-
-    def __str__(self):
-        return "(PK: " + str(self._primary_key) + ")"
+from .tuple import Tuple
 
 
 # TODO: Probably relation needs to not organize data on the primary key due to combo primary keys
@@ -100,6 +30,12 @@ class Relation:
     def get_attribute_row_counts(self):
         return self._attribute_row_counts
 
+    def get_index_set(self):
+        return self._index_set
+
+    def set_indexes(self, index_set):
+        self._index_set = index_set
+
     def set_data(self, data):
         self._data = data
 
@@ -113,23 +49,6 @@ class Relation:
         self._attributes = copy.deepcopy(self._attributes) + new_attributes
         self._attribute_row_counts = copy.deepcopy(self._attribute_row_counts)
         self._attribute_row_counts.update(new_attribute_counts)
-        # self._attribute_row_counts += right_rel.get_attribute_row_counts()
-
-        # keys = list(self._data.keys())
-        # attributes = self._data[keys[0]].get_attributes()
-        #
-        # right_rel
-        #
-        # new_attributes = {}
-        # for key, value in attributes.items():
-        #     new_attributes["right_side_" + str(key)] = value + increment_right
-        # data_to_gen = copy.deepcopy(self._data)
-        # for key in data_to_gen.keys():
-        #     data_to_gen[key].set_attributes(new_attributes)
-        #     new_right_side_data.append(data_to_gen[key])
-        #
-        # return new_right_side_data
-        # final_data = self._data.items()
 
     def get_attributes_for_right_join(self, increment_right):
         new_attributes = []
@@ -150,58 +69,17 @@ class Relation:
             value.print()
             print("\n")
 
-    # def join(self, relation, attribute_left, attribute_right):
-    #     schema = {'attributes': self._attributes, 'location': None, 'primary_key': self._primary_key}
-    #     result = Relation(schema, "join_" + self._name + "_" + relation._name, self._index_set)
-    #     if attribute_left == self._primary_key:
-    #         new_data = {}
-    #         joining_relation = None
-    #         for key in self._data.keys():
-    #             joining_relation = relation.select(attribute_right, key)
-    #             right_data = joining_relation.get_data_for_right_join(len(self._attributes))
-    #             i = 0
-    #             for d in right_data:
-    #                 new_data[str(key) + "_" + str(i)] = self._data[key].merge(d)
-    #                 i += 1
-    #         result.set_data(new_data)
-    #         result.update_right_join_attributes(joining_relation, len(self._attributes))
-    #         return result
-    #     elif self._index_set.find_index(attribute_left):
-    #         new_data = {}
-    #         joining_relation = None
-    #         for key, value in self._data.items():
-    #             joining_key = self._value_for_attribute(value, attribute_left)
-    #             joining_relation = relation.select(attribute_right, joining_key)
-    #             right_data = joining_relation.get_data_for_right_join()
-    #             i = 0
-    #             for d in right_data:
-    #                 new_data[str(key) + "_" + str(i)] = self._data[key].merge(d)
-    #                 i += 1
-    #         result.set_data(new_data)
-    #         result.update_right_join_attributes(joining_relation, len(self._attributes))
-    #         return result
-        # elif self._index_set.find_index(attribute):
-        #     select_index = self._index_set.find_index(attribute)
-        #     hashes = select_index.find(value)
-        #     new_data = {}
-        #     for key in hashes:
-        #         new_item = self._data[key]
-        #         new_data[key] = new_item
-        #     result.set_data(new_data)
-        #     return result
-        # else:
-        #     new_data = {}
-        #     for key, pair in self._data.items():
-        #         if value == pair.value_for_attribute(attribute):
-        #             new_data[key] = pair
-        #     result.set_data(new_data)
-        #     return result
-    def join(self, relation, attribute_left, attribute_right):
-        schema = {'attributes': self._attributes, 'location': None, 'primary_key': self._primary_key}
-        result = Relation(schema, "join_" + self._name + "_" + relation._name, self._index_set)
+    def join(self, relation, attribute_left, attribute_right, update_index_set=True):
+        # TODO: Join should lose an attribute
+        # self._primary_key - updating is different
+        schema = {'attributes': self._attributes, 'location': None, 'primary_key': "fake_pk"}
+        result = Relation(schema, "join_" + self._name + "_" + relation._name, None)
 
         new_data = {}
         joining_relation = None
+
+        rhs_join_index = Index("in_memory", "join_" + self._name + "_" + relation._name, "join_to_id")
+        lhs_join_index = Index("in_memory", "join_" + self._name + "_" + relation._name, "join_to_id")
 
         join_type = "default"
         if attribute_left == self._primary_key:
@@ -222,38 +100,79 @@ class Relation:
             right_data = joining_relation.get_data_for_right_join()
             i = 0
             for d in right_data:
+                if update_index_set:
+                    lhs_join_index.add_index(key, str(key) + "_" + str(i))
+                    rhs_join_index.add_index(d.get_primary_key(), str(key) + "_" + str(i))
                 new_data[str(key) + "_" + str(i)] = self._data[key].merge(d)
                 i += 1
 
+        if update_index_set:
+            lhs_join_index_set = copy.deepcopy(self.get_index_set())
+            lhs_join_index_set.add_sub_index(lhs_join_index)
+            rhs_join_index_set = copy.deepcopy(relation.get_index_set())
+            rhs_join_index_set.add_sub_index(rhs_join_index)
+
+            for abute in rhs_join_index_set.get_index_attributes():
+                i_to_add = rhs_join_index_set.find_index(abute)
+                i_to_add.update_attribute_name("right_side_" + abute)
+                lhs_join_index_set.add_index(i_to_add)
+
+            result.set_indexes(lhs_join_index_set)
         result.set_data(new_data)
         result.update_right_join_attributes(joining_relation, len(self._attributes))
+
+        # if update_index_set:
+        #     # TODO: What happens if no indexes
+        #     left_index_abutes = list(self._index_set.get_index_attributes())
+        #     right_index_abutes = list(relation.get_index_set().get_index_attributes())
+        #
+        #     right_index_abutes = ["right_side_" + str(abute) for abute in right_index_abutes]
+        #     left_index_abutes += right_index_abutes
+        #
+        #     result.build_index_set_with_attributes(left_index_abutes)
+
         return result
 
+    def _add_sub_index(self, sub_index):
+        self._index_set.add_sub_index(sub_index)
+
+    def build_index_set_with_attributes(self, attributes):
+        indexes = []
+        if len(attributes) > 0:
+            for abute in attributes:
+                new_index = Index("memory_index", self._name, abute)
+                for k, v in self._data.items():
+                    key = self._value_for_attribute(v, abute)
+                    new_index.add_index(key, k)
+                indexes.append(new_index)
+            new_index_set = IndexSet(indexes.pop(0))
+            for indx in indexes:
+                new_index_set.add_index(indx)
+            self._index_set = new_index_set
+
     def select(self, attribute, value):
+        # TODO ensure all values are distinct
         schema = {'attributes': self._attributes, 'location': None, 'primary_key': self._primary_key}
         result = Relation(schema, "select_" + self._name, self._index_set)
+        new_data = {}
+
         if attribute == self._primary_key:
-            new_data = {}
             new_item = self._data[value]
             new_data[value] = new_item
-            result.set_data(new_data)
-            return result
-        elif self._index_set.find_index(attribute):
+        elif self._index_set and self._index_set.find_index(attribute):
             select_index = self._index_set.find_index(attribute)
             hashes = select_index.find(value)
-            new_data = {}
             for key in hashes:
-                new_item = self._data[key]
-                new_data[key] = new_item
-            result.set_data(new_data)
-            return result
+                if key in self._data.keys():
+                    new_item = self._data[key]
+                    new_data[key] = new_item
         else:
-            new_data = {}
             for key, pair in self._data.items():
                 if value == self._value_for_attribute(pair, attribute):
                     new_data[key] = pair
-            result.set_data(new_data)
-            return result
+
+        result.set_data(new_data)
+        return result
 
     def _value_for_attribute(self, tup, attribute):
         if attribute not in self._attribute_row_counts.keys():

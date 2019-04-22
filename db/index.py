@@ -11,9 +11,16 @@ class IndexSet:
         self.relation = start_index.relation
         self.add_index(start_index)
 
+    def add_sub_index(self, sub_index):
+        for k,v in self._data.items():
+            v.add_sub_index(sub_index)
+
     def add_index(self, index):
         if index.attribute not in self._data.keys():
             self._data[index.attribute] = index
+
+    def get_index_attributes(self):
+        return self._data.keys()
 
     def find_index(self, attribute):
         if attribute not in self._data.keys():
@@ -22,20 +29,38 @@ class IndexSet:
 
 
 class Index:
-    def __init__(self, name, relation, attribute):
+    def __init__(self, name, relation, attribute, master_index=False):
         self.name = name
-        self._data = {}
-        self._location = "./index/" + name + ".csv"
-        self._data = {}
         self.relation = relation
         self.attribute = attribute
-        self._load_index()
+        self._data = {}
+        self._master_index = master_index
+        self._sub_index = None
+
+        if master_index:
+            self._location = "./index/" + name + ".csv"
+            self._load_index()
+
+    def update_attribute_name(self, new_name):
+        self.attribute = new_name
+
+    def add_sub_index(self, sub_index):
+        if self._sub_index:
+            self._sub_index.add_sub_index(sub_index)
+        else:
+            self._sub_index = sub_index
 
     def find(self, key):
+        index_data = []
         if key in self._data.keys():
-            return self._data[key]
-        else:
-            return []
+            index_data = self._data[key]
+
+        if self._sub_index:
+            final_index_data = []
+            for key in index_data:
+                final_index_data += self._sub_index.find(key)
+            return final_index_data
+        return index_data
 
     def _load_index(self):
         if os.path.isfile(self._location):
@@ -46,9 +71,20 @@ class Index:
                     self._data[key] = new_things
             inf.close()
 
-    def _add_index(self, key, loc):
+    def add_index(self, key, loc):
+        if self._master_index:
+            self._add_index_from_file(key, loc)
+        else:
+            if str(key) in self._data.keys():
+                current_locations = self._data[key]
+                current_locations.append(loc)
+                self._data[key] = current_locations
+            else:
+                self._data[key] = [loc]
+
+    def _add_index_from_file(self, key, loc):
         self._load_index()
-        # self._read_indexes()
+
         index_data = []
 
         all_indexes = []
@@ -100,24 +136,3 @@ class Index:
 
         with open(self._location, 'w') as f:
             f.writelines(final_lines)
-
-    # def get_primary_key(self):
-    #     return self._primary_key
-    #
-    # def __lt__(self, other):
-    #     return self._primary_key < other.get_primary_key()
-    #
-    # def __le__(self, other):
-    #     return self._primary_key <= other.get_primary_key()
-    # # def  __eq__(self, other):
-    # #
-    # # def  __ne__(self, other):
-    #
-    # def __gt__(self, other):
-    #     return self._primary_key > other.get_primary_key()
-    #
-    # def __ge__(self, other):
-    #     return self._primary_key >= other.get_primary_key()
-    #
-    # def __str__(self):
-    #     return "(PK: " + str(self._primary_key) + ")"

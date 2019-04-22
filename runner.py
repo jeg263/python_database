@@ -4,11 +4,13 @@ from db.errors import *
 try:
     db = DB()
     # db.select("Q")
-    db.select("B", [{"attribute": 'value2', "value": '25'}]).print()
+    db.select("B", [{"attribute": 'value2', "value": '25'}])
     print("break")
-    db.select(db.select("B"), [{"attribute": 'value2', "value": '25'}]).print()
+    db.select(db.select("B"), [{"attribute": 'value2', "value": '25'}])
     c = db.select("C")
-    db.join(c, c, "value", "value").print()
+    j = db.join(c, c, "value", "value")
+
+    db.select(j, [{"attribute": 'id', "value": '5'}]).print()
 except SQLInputError as err:
     print("SQL Input Error: " + str(err.args[0]))
 # for i in range(1, 1001):
