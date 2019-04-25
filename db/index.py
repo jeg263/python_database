@@ -8,6 +8,7 @@ import fileinput
 class IndexSet:
     def __init__(self, start_index):
         self._data = {}
+        self._combination_indexes = {}
         self.relation = start_index.relation
         self.add_index(start_index)
 
@@ -18,9 +19,81 @@ class IndexSet:
     def add_index(self, index):
         if index.attribute not in self._data.keys():
             self._data[index.attribute] = index
+            if index.combination_index == True:
+                self._add_combination_index(index)
+
+    def _add_combination_index(self, index):
+        abutes = index.attribute.split("+")
+        self._add_combination_attributes(abutes, self._combination_indexes)
+
+    def _add_combination_attributes(self, abutes, combination_dictionary):
+        new_dictionary = {}
+        if len(abutes) == 0:
+            return {}
+        else:
+            indexing_abute = abutes.pop(0)
+            if indexing_abute not in combination_dictionary.keys():
+                combination_dictionary[indexing_abute] = self._add_combination_attributes(abutes, new_dictionary)
+                return combination_dictionary
+            else:
+                self._add_combination_attributes(abutes, combination_dictionary[indexing_abute])
+                return combination_dictionary
 
     def get_index_attributes(self):
         return self._data.keys()
+
+    def _flatten_combination_array(self, lhs, rhs):
+        combination_array = []
+        if len(rhs) == 0:
+            combination_array.append([lhs])
+            return combination_array
+
+        for obj in rhs:
+            combination_array.append([lhs] + obj)
+        return combination_array
+
+    def _find_combination_index_recursive(self, rge, attributes, combination_dict):
+        if len(combination_dict.keys()) == 0:
+            return []
+
+        result = []
+
+        for j in rge:
+            if attributes[j] in combination_dict.keys():
+                combination_array = self._flatten_combination_array(attributes[j],
+                                                                    self._find_combination_index_recursive(range(j + 1,
+                                                        len(attributes)), attributes, combination_dict[attributes[j]]))
+                result += combination_array
+        return result
+
+    def find_combination_indexes(self, attributes):
+        combination_attributes = []
+        for i in range(0, len(attributes) - 1):
+            if attributes[i] in self._combination_indexes.keys():
+                combination_attributes += self._flatten_combination_array(attributes[i],
+                                        self._find_combination_index_recursive(range(i + 1, len(attributes)),
+                                                        attributes, self._combination_indexes[attributes[i]]))
+
+        return combination_attributes
+
+    def project_indexes(self, attributes, as_attributes):
+        attributes_to_delete = []
+        new_items = {}
+        for k, v in self._data.items():
+            i = 0
+            for abute in attributes:
+                if abute == k and k != as_attributes[i]:
+                    new_items[as_attributes[i]] = v
+                    v.attribute = as_attributes[i]
+                    attributes_to_delete.append(k)
+                i += 1
+        for abute in attributes_to_delete:
+            self._data.pop(abute)
+
+        for k, v in new_items.items():
+            self._data[k] = v
+
+        return self
 
     def find_index(self, attribute):
         if attribute not in self._data.keys():
@@ -37,6 +110,11 @@ class Index:
         self._master_index = master_index
         self._sub_index = None
 
+        self.combination_index = False
+        has_multiple_abutes = self.attribute.find("+")
+        if has_multiple_abutes != -1:
+            self.combination_index = True
+
         if master_index:
             self._location = "./index/" + name + ".csv"
             self._load_index()
@@ -50,10 +128,39 @@ class Index:
         else:
             self._sub_index = sub_index
 
-    def find(self, key):
+    def find(self, key, domain="string", operation="="):
         index_data = []
-        if key in self._data.keys():
-            index_data = self._data[key]
+
+        # if domain == "string" and operation == "=":
+        #     if key in self._data.keys():
+        #         index_data = self._data[key]
+        d = {}
+        if domain == "string":
+            d = self._data
+        elif domain == "integer":
+            d = {int(k): v for k, v in self._data.items()}
+            key = int(key)
+        elif domain == "float":
+            d = {float(k): v for k, v in self._data.items()}
+            key = float(key)
+
+        if operation == "=":
+            if key in d.keys():
+                index_data = d[key]
+        else:
+            if operation == "!=":
+                keys = list(set(d.keys()).difference(set([key])))
+            elif operation == ">=" or operation == "=>":
+                keys = [k for k in d.keys() if k >= key]
+            elif operation == "<=" or operation == "=<":
+                keys = [k for k in d.keys() if k <= key]
+            elif operation == ">" or operation == ">":
+                keys = [k for k in d.keys() if k > key]
+            else:
+                keys = [k for k in d.keys() if k < key]
+            for key_to_i in keys:
+                index_data += d[key_to_i]
+        key = str(key)
 
         if self._sub_index:
             final_index_data = []

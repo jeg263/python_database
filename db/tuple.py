@@ -9,8 +9,17 @@ class Tuple:
         else:
             self._data = values
 
+    def delete_column_counts(self, column_counts, in_order=False):
+        if not in_order:
+            column_counts = sorted(column_counts, reverse=True)
+        for column_count in column_counts:
+            self._data.pop(column_count)
+
     def get_primary_key(self):
         return self._primary_key
+
+    def update_value_for_index(self, i, value):
+        self._data[i] = value
 
     def get_value_for_index(self, i):
         return self._data[i]
@@ -32,6 +41,26 @@ class Tuple:
             else:
                 s += str(d) + " "
                 # print(str(d) + " ", end='')
+        return s
+
+    def tabulation_values(self, attribute_row_count_array):
+        s = []
+
+        for i in sorted(attribute_row_count_array):
+            d = self._data[i]
+            if d is None:
+                s.append("? ")
+                # print("? ", end='')
+            else:
+                s.append(str(d))
+                # print(str(d) + " ", end='')
+        # for d in self._data:
+        #     if d is None:
+        #         s.append("? ")
+        #         # print("? ", end='')
+        #     else:
+        #         s.append(str(d))
+        #         # print(str(d) + " ", end='')
         return s
 
     def print(self):

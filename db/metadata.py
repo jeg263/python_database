@@ -24,7 +24,25 @@ class Metadata:
         return self._relations
 
     def get_indexes(self):
-        return self._index_md
+        maped_indexes = set(map(lambda x: x[0], self._index_md))
+        grouped_indexes = [[y for y in self._index_md if y[0] == x] for x in maped_indexes]
+        meta_data_indexes = []
+        for indice in grouped_indexes:
+            if len(indice) > 1:
+                index_name = indice[0][0]
+                index_relation = indice[0][1]
+                index_type = "type"
+                index_attribute = ""
+                for i in range(0, len(indice)):
+                    indx_abute = indice[i]
+                    indx_abute = indx_abute[3]
+                    index_attribute += indx_abute
+                    if i != len(indice) - 1:
+                        index_attribute += "+"
+                meta_data_indexes.append([index_name, index_relation, index_type, index_attribute])
+            else:
+                meta_data_indexes.append(indice[0])
+        return meta_data_indexes
 
     def _build_relations_info(self):
         for rel in self._relation_md:
@@ -147,20 +165,20 @@ class Metadata:
         self._relation_md.append([relation_name, "./data/" + relation_name, primary_key])
         self._save_relation_metadata()
         self.add_attributes(relation_name, [primary_key], [primary_key_domain_type])
-        self.add_indexes(relation_name, ["index_" + relation_name + "_" + primary_key + "_primary_key"], ["type"],
-                         [primary_key])
+        self.add_indexes(relation_name, ["index_" + relation_name + "_" + primary_key + "_primary_key"], [["type"]],
+                         [[primary_key]])
 
     def add_attributes(self, relation_name, attribute_names, domain_types):
         for i in range(len(attribute_names)):
             self._add_attribute(relation_name, attribute_names[i], domain_types[i])
         self._save_attribute_metadata()
 
-    def add_indexes(self, relation_name, index_names, index_types, index_attributes):
+    def add_indexes(self, relation_name, index_names, index_type_arrays, index_attribute_arrays):
         for i in range(len(index_names)):
-            self._check_for_duplicate_index(index_names[i], relation_name, index_attributes)
+            self._check_for_duplicate_index(index_names[i])
 
         for i in range(len(index_names)):
-            self._add_index(index_names[i], relation_name, index_types[i], index_attributes[i])
+            self._add_index(index_names[i], relation_name, index_type_arrays[i], index_attribute_arrays[i])
         self._save_index_metadata()
 
     def add_foreign_keys(self, relation, attributes, foreign_keys, foreign_key_tables):
@@ -215,16 +233,21 @@ class Metadata:
 
         self._attribute_md.append([relation_name, attribute_name, domain_type])
 
-    def _check_for_duplicate_index(self, index_name, relation_name, index_attributes):
+    def _check_for_duplicate_index(self, index_name):
         existing_indexes = [indexes for indexes in self._index_md if
-                            indexes[0] == index_name or (indexes[1] == relation_name and
-                                                         indexes[3] == index_attributes)]
+                            indexes[0] == index_name]
+        # existing_indexes = [indexes for indexes in self._index_md if
+        #                 indexes[0] == index_name or (indexes[1] == relation_name and
+        #                                              indexes[3] == index_attributes)]
 
         if len(existing_indexes) > 0:
             raise DuplicateIndex
 
-    def _add_index(self, index_name, relation_name, index_type, index_attributes):
-        self._index_md.append([index_name, relation_name, index_type, index_attributes])
+    def _add_index(self, index_name, relation_name, index_types, index_attributes):
+        if len(index_types) != len(index_attributes):
+            raise SQLInputError("New indexes must have an equal number of types and attributes")
+        for i in range(len(index_attributes)):
+            self._index_md.append([index_name, relation_name, index_types[i], index_attributes[i]])
 
     def _check_for_duplicate_fk(self, relation, attribute):
         existing_fks = [fk for fk in self._foreign_key_md if

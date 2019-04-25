@@ -4,11 +4,26 @@ from .index import Index, IndexSet
 import os
 from .errors import *
 
-# TODO: Right now indexes, primary, and foreign keys can only be one attribute
-# TODO: This is the highest priority feature to add
-# TODO: Next priority is add def project - this will remove and allow renaming of attributes
-# TODO: Update
-# TODO: Delete
+# TODO: Delete - fix referential integrity + handle deleting indexes
+# TODO: Update - fix referential integrity
+
+# TODO: Drop table
+# TODO: Drop index
+# TODO: Drop attributes
+
+# TODO: Aggregation functions
+
+# TODO: Multiple attribute primary keys and foreign keys (hardest)
+# TODO: Project - projecting primary keys, when it removes duplicates
+
+# TODO: add index after data has been placed in relation
+# TODO: Build test cases
+# TODO: Documentation
+# TODO: verify that input supplied is actually the type said
+# TODO: Simple optimization
+#       Ordering join statements
+
+
 class DB:
     def __init__(self):
         self._md = Metadata()
@@ -29,33 +44,33 @@ class DB:
     # left_relation - relation object, left relation when saying:
     # FROM relation_left, relation_right WHERE relation_left.x = relation_right.y
     # right_relation - relation object is the right one
-    # left_on is the left attribute to join on (so in the above it would be x)
-    # right_on is the right one
+    # left_on is an array of the left attribute to join on (so in the above it would be x)
+    # right_on is an array of the right ones
     # update_indexes defaults to true - when set to true the join will updates the indexes for the new relation
     # it returns. Because this on (very) large rleations can take time, the option exists to join without updating
     # indexes. If this is done however, it is best not to perform any select operations on the resulting relation
     # since it will have no indexes
     #
+    # operation is the type of join, so =, >, <, !=, >=, <=
+    #
     # Example (to join relation C with itself on the value attribute and update the indexes):
     # c = db.select("C")
-    # db.join(c, c, "value", "value")
-    #
-    # TODO: Currently the join is only an equal-join
-    def join(self, left_relation, right_relation, left_on, right_on, update_indexes=True):
-        return left_relation.join(right_relation, left_on, right_on, update_indexes)
+    # db.join(c, c, ["value"], ["value"], "operation")
+    def join(self, left_relation, right_relation, left_on, right_on, operation="=", update_indexes=True):
+        if len(left_on) != len(right_on):
+            raise SQLInputError("The number of join conditions on the left and right sides must equal one another")
+        return left_relation.join(self, right_relation, left_on, right_on, update_indexes, operation)
 
     # relation - this can either be a string or relation object. If it is a string it will find a saved relation
     # with the name provided. If it is a relation object it will perform the selection on that object
     # where: this is an array of where clauses in the form of:
-    # [{"attribute1": 'attribute_name', "value1": 'value_of_attribute_selecting_on'},
-    # {"attribute2": 'attribute_name', "value2": 'value_of_attribute_selecting_on'}]
+    # [{"attribute1": 'attribute_name', "value1": 'value_of_attribute_selecting_on', "operation": "="},
+    # {"attribute2": 'attribute_name', "value2": 'value_of_attribute_selecting_on', "operation": ">"}]
     # if the where clause is empty select just returns the relation object for relation.
     #
     # Examples (produce the same result):
-    # db.select("B", [{"attribute": 'value2', "value": '25'}])
-    # db.select(db.select("B"), [{"attribute": 'value2', "value": '25'}])
-    #
-    # TODO: Currently the select is only select =. Needs more functionality
+    # db.select("B", [{"attribute": 'value2', "value": '25', "operation": "="}])
+    # db.select(db.select("B"), [{"attribute": 'value2', "value": '25', "operation": ">"}])
     def select(self, relation, where=None):
         if not isinstance(relation, Relation):
             if relation in self._relations.keys():
@@ -65,12 +80,68 @@ class DB:
         if where is None or len(where) == 0:
             return relation
 
+        combo_select_attributes = relation.check_for_combo_select(where)
+        where = combo_select_attributes + where
+
+        for combo_select_abute in combo_select_attributes:
+            attribute = combo_select_abute['attribute']
+            attributes_to_delete = set(attribute.split("+"))
+
+            where = [x for x in where if x['attribute'] not in attributes_to_delete]
+
         condition = where.pop(0)
-        selected_relation = relation.select(condition['attribute'], condition['value'])
+        operation = "="
+        if "operation" in condition.keys():
+            operation = condition["operation"]
+        selected_relation = relation.select(condition['attribute'], condition['value'], operation)
         if len(where) == 0:
             return selected_relation
         else:
             return self.select(selected_relation, where)
+
+    def project(self, relation, attributes, as_attributes=None, deepcopy=False):
+        return relation.project(attributes, as_attributes, deepcopy)
+
+    # TODO: test to make sure you don't update a foreign key someone depends upon
+    # The other main thing I have to do though is check for referential integrity before and after
+    # I also need to verify that none of the new values will cause problems before I delete
+    def update(self, relation, values, where):
+        # TODO: if you update a primary key a lot of indexes need to change
+        # TODO: if you update a primary key it needs to not just change the tuples as currently
+        # TODO: need to have an override constrains variable for delete
+        relations_to_update = self.select(relation, where)
+        tuples_to_update = len(relations_to_update)
+        if tuples_to_update == 0:
+            raise SQLInputError("No tuples to update with those parameters")
+
+        for value in values:
+            domain_of_abute = relation._domains[value['attribute']]
+            if domain_of_abute == 'integer':
+                value['value'] = str(int(value['value']))
+            elif domain_of_abute == "float":
+                value['value'] = str(float(value['value']))
+
+            if value['attribute'] == relation._primary_key:
+                if tuples_to_update > 1:
+                    raise SQLInputError("Cannot update the primary key of more than one tuple to the same value")
+                if value['value'] in relation.get_primary_keys():
+                    raise SQLInputError("An attribute already exists with the primary key you are updating")
+
+        relations_to_update = relations_to_update.update_all(values)
+        values_to_insert = relations_to_update.get_attribute_value_array()
+
+        self.delete(relation, where)
+        for value in values_to_insert:
+            self.insert_tuple(relation, value)
+        return relation
+
+    # TODO: Needs to update the file
+    # TODO: referential integrity
+    def delete(self, relation, where):
+        # TODO: if you delete a tuple some indexes likely change
+
+        relation_to_remove = self.select(relation, where)
+        return relation.delete(relation_to_remove)
 
     # relation is a relation object
     # Values should be an array of the format: [{attribute: 'atribute_name', value: 'value'}]
@@ -85,8 +156,8 @@ class DB:
     # db.create_indexes("A", ["value"], ["type"], ["A_value_index"])
     # TODO: The database needs to index all the data if an index is new but data already exists
     # TODO: Also will need to add index to indexes array
-    def create_indexes(self, relation, attributes, types, names):
-        self._md.add_indexes(relation, names, types, attributes)
+    def create_indexes(self, relation, attribute_arrays, type_arrays, names):
+        self._md.add_indexes(relation, names, type_arrays, attribute_arrays)
 
     # Pretty self explanatory - look at the example
     # db.create_table("B", "id", "string", ["value", "value2", "value3"],
@@ -122,66 +193,3 @@ class DB:
     def _load_data(self):
         for relation in self._schemas.keys():
             self._relations[relation] = Relation(self._schemas[relation], relation, self._indexes[relation], True)
-
-
-
-
-
-
-                # Random junk
-# # f = open("./demofile3.arff", "w")
-# #
-# # relation_metadata = {
-# #     'relation': 'relation_metadata',
-# #     'attributes': [
-# #         ('relation_name', 'STRING'),
-# #         ('location', 'STRING'),
-# #         ('primary_key', 'STRING')
-# #     ],
-# #     'data': [
-# #         ["students", "./data/students", "student_id"],
-# #         ["universities", "./data/universities", "university_id"],
-# #     ]
-# # }
-# #
-# # f.write(arff.dumps(relation_metadata))
-# # f.close()
-#
-# arff_file = arff.load(open("./demofile3.arff", 'r'))
-# abutes = arff_file['attributes']
-# data = arff_file['data']
-# # #
-# f = open("./demofile3.arff", "w")
-# f.write(arff.dumps(arff_file))
-# # #
-# # #
-# # #
-# # #
-# f.close()
-#
-#
-# # def load_arff_file(self, file_name):
-# #     print("Loading arff file")
-# #     print("Loading arff file", file=open("adult.out", "a"))
-# #     arff_file = arff.load(open(file_name))
-# #     abutes = arff_file['attributes']
-# #
-# #     data = arff_file['data']
-# #
-# #     numeric_keys = [x[0] for x in abutes if self._get_abute_numeric(x)]
-# #     non_numeric_keys = [x[0] for x in abutes if not self._get_abute_numeric(x)]
-# #
-# #     # abutes = [x[0] for x in abutes]
-# #     # columns_change = {i: x for i, x in enumerate(abutes)}
-# #     #
-# #     # df = df.rename(index=str, columns=columns_change)
-# #     self._numeric_data = numeric_keys
-# #     self._non_numeric_columns = non_numeric_keys
-# #
-# #
-# # def _get_abute_numeric(self, ab):
-# #     numeric = ab[1]
-# #     if numeric == 'NUMERIC' or numeric == 'REAL' or numeric == 'INTEGER':
-# #         return True
-# #     else:
-# #         return False

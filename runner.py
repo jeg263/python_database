@@ -1,16 +1,41 @@
 from db.db import DB
 from db.errors import *
 
+# Need pip install tabulate
+
 try:
     db = DB()
-    # db.select("Q")
-    db.select("B", [{"attribute": 'value2', "value": '25'}])
-    print("break")
-    db.select(db.select("B"), [{"attribute": 'value2', "value": '25'}])
-    c = db.select("C")
-    j = db.join(c, c, "value", "value")
+    # db.create_table("Course", "id", "string", ["professor", "year", "student_id"],
+    #                 ["string", "string", "string"])
+    # db.create_indexes("Course", [["professor", "year"]], [["type", "type"]], ["course_professor_year_index"])
 
-    db.select(j, [{"attribute": 'id', "value": '5'}]).print()
+    db.select("B").print()
+    # db.update(db.select("C"), [{'attribute': "value", "value": "2"}], [{"attribute": "id", "value": "1"}]).print()
+    # db.insert_tuple(db.select("Course"), [{"attribute": "id", "value": "beg263"}, {"attribute": "professor", "value": "Woods"},
+    #                     {"attribute": "year", "value": "2016"}, {"attribute": "student_id", "value": "id"}])
+
+    # db.insert_tuple(db.select("C"),
+    #                 [{"attribute": "id", "value": 500}, {"attribute": "value", "value": "2"}])
+
+    c = db.select("C", [{'attribute': "id", "value": "10", "operation": "<="}])
+    c.print()
+    # db.update(c, [{'attribute': "id", "value": "101"}], [{"attribute": "id", "value": "2"}]).print()
+    j = db.join(c, db.select("B"), ["id"], ["id"], ">")
+    j.print()
+    db.project(j, ["value"], ["value2"]).print()
+
+    # courses = db.select("Course", [{"attribute": "professor", "value": "Woods"},
+    #                     {"attribute": "year", "value": "2016"}, {"attribute": "id", "value": "beg263"}]).print()
+
+
+    # # db.select("Q")
+    # db.select("B", [{"attribute": 'value2', "value": '25'}])
+    # print("break")
+    # db.select(db.select("B"), [{"attribute": 'value2', "value": '25'}])
+    # c = db.select("C")
+    # j = db.join(c, c, "value", "value")
+    #
+    # db.select(j, [{"attribute": 'id', "value": '5'}]).print()
 except SQLInputError as err:
     print("SQL Input Error: " + str(err.args[0]))
 # for i in range(1, 1001):
