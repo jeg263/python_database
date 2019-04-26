@@ -5,10 +5,10 @@
 @ATTRIBUTE primary_key STRING
 
 @DATA
-students,./data/students,student_id
-universities,./data/universities,university_id
+Students,./data/Students,id
+University,./data/University,id
+StudentsUniversity,./data/StudentsUniversity,studentID+universityID
 A,./data/A,id
 B,./data/B,id
 C,./data/C,id
 D,./data/D,id
-Course,./data/Course,id

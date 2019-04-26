@@ -1,12 +1,14 @@
-@RELATION students
+@RELATION Students
 
-@ATTRIBUTE student_id STRING
-@ATTRIBUTE full_name STRING
-@ATTRIBUTE phone_number STRING
-@ATTRIBUTE age NUMERIC
-@ATTRIBUTE university STRING
+@ATTRIBUTE id STRING
+@ATTRIBUTE name STRING
+@ATTRIBUTE email STRING
 
 @DATA
-25,?,?,?,61
-10,?,?,?,24
-24,?,?,?,24
+3,?,?
+1,?,?
+17,?,?
+24,?,?
+10,JohnDoe,jeg263@georgetown.edu
+102,JohnDoe,jeg263@georgetown.edu
+1202,JohnDoe,jeg263@georgetown.edu

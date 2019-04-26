@@ -1,3 +1,0 @@
-metadata
-- index attribute arrays
-- index type arrays

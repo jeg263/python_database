@@ -6,18 +6,13 @@
 @ATTRIBUTE index_attributes STRING
 
 @DATA
-index_students_student_id_primary_key,students,type,student_id
-index_universities_university_id_primary_key,universities,type,university_id
-student_university_index,students,type,university
+index_Students_id_primary_key,Students,type,id
+index_University_id_primary_key,University,type,id
+index_StudentsUniversity_studentID+universityID_primary_key,StudentsUniversity,type,studentID
+index_StudentsUniversity_studentID+universityID_primary_key,StudentsUniversity,type,universityID
+StudentsUniversityStudentIDIndex,StudentsUniversity,type,studentID
+StudentsUniversityUniversityIDIndex,StudentsUniversity,type,universityID
 index_A_id_primary_key,A,type,id
 index_B_id_primary_key,B,type,id
 index_C_id_primary_key,C,type,id
 index_D_id_primary_key,D,type,id
-A_value_index,A,type,value
-B_value_index,B,type,value
-B_value2_index,B,type,value2
-C_value_index,C,type,value
-D_value_index,D,type,value
-index_Course_id_primary_key,Course,type,id
-course_professor_year_index,Course,type,professor
-course_professor_year_index,Course,type,year

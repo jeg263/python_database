@@ -1,4 +1,3 @@
-from btree.Btree import *
 from .errors import *
 import os
 import arff
@@ -155,7 +154,7 @@ class Relation:
             v.delete_column_counts(column_counts, in_order=True)
             self._data[k] = v
 
-    def join(self, db, relation, attributes_left, attributes_right, update_index_set=True, operation="="):
+    def join(self, db, relation, attributes_left, attributes_right, update_index_set=True, operations=["="]):
         schema = {'attributes': copy.deepcopy(self._attributes), 'location': None, 'primary_key': "fake_pk"}
         result = Relation(schema, "join_" + self._name + "_" + relation.get_name(), None)
 
@@ -165,13 +164,12 @@ class Relation:
         rhs_join_index = Index("in_memory", "join_" + self._name + "_" + relation.get_name(), "join_to_id")
         lhs_join_index = Index("in_memory", "join_" + self._name + "_" + relation.get_name(), "join_to_id")
 
-        # TODO: verify that this no joining on primary key works
         for key, value in self._data.items():
             joining_keys = self._values_for_attributes(value, attributes_left)
             attributes_right_to_join_on = []
             for i in range(0, len(attributes_right)):
                 attributes_right_to_join_on.append(
-                    {"attribute": attributes_right[i], "value": joining_keys[i], "operation": operation})
+                    {"attribute": attributes_right[i], "value": joining_keys[i], "operation": operations[i]})
             joining_relation = db.select(relation, attributes_right_to_join_on)
 
             right_data = joining_relation.get_data_for_right_join()
@@ -234,6 +232,18 @@ class Relation:
     def __len__(self):
         return len(self._data)
 
+    def _drop_foreign_key(self, db, attribute):
+        db.drop_foreign_key(self._name, attribute)
+
+    def drop(self, db):
+        for k, v in self._index_set._data.items():
+            db.drop_index(v.get_name())
+        for attribute in [x['name'] for x in self._attributes]:
+            self._drop_foreign_key(db, attribute)
+        if os.path.isfile(self._location + ".arff"):
+            os.remove(self._location + ".arff")
+            # os.remove("./data/" + self._name + ".arff")
+
     def constrain_attributes(self, attributes, as_attributes):
         self._attributes = [x for x in self._attributes if x['name'] in set(attributes)]
         new_attribute_counts = {}
@@ -260,7 +270,7 @@ class Relation:
     def project_indexes(self, attributes, as_attributes):
         return self._index_set.project_indexes(attributes, as_attributes)
 
-    def project(self, attributes, as_attributes=None, deepcopy=False):
+    def project(self, attributes, as_attributes=None, deepcopy=False, lose_rhs=False):
         if as_attributes is None:
             as_attributes = attributes
 
@@ -268,6 +278,20 @@ class Relation:
             raise SQLInputError("If changing the name of an attribute, every attribute name must be changed")
 
         # projected_attributes = [x for x in self._attributes if x['name'] in set(attributes)]
+        if lose_rhs:
+            i = 0
+            for abute in attributes:
+                if abute.find("right_side_") != -1 and abute not in self._attribute_row_counts.keys():
+                    attributes[i] = abute[len("right_side_"):]
+                i += 1
+            for i in range(0, len(as_attributes)):
+                if as_attributes[i].find("right_side_") != -1:
+                    if as_attributes[i][len("right_side_"):] not in set([x['name'] for x in self._attributes]):
+                        as_attributes[i] = as_attributes[i][len("right_side_"):]
+                    elif as_attributes[i][len("right_side_"):] in set(attributes):
+                        as_attributes[i] = as_attributes[i][len("right_side_"):]
+                i += 1
+
 
         if deepcopy:
             indexes_to_change = copy.deepcopy(self._index_set)
@@ -287,6 +311,12 @@ class Relation:
     def delete(self, relation):
         tuples_to_delete = relation.get_tuples()
         primary_keys_to_delete = [x.get_primary_key() for x in tuples_to_delete]
+        attributes_in_index_set = self._index_set.get_index_attributes()
+        for abute in attributes_in_index_set:
+            i = self._index_set.find_index(abute)
+            # print(abute)
+            if i:
+                i.remove_pks_from_index(set(primary_keys_to_delete))
 
         for key in primary_keys_to_delete:
             self._data.pop(key)
@@ -305,7 +335,6 @@ class Relation:
         relation_data = []
 
         if os.path.isfile(self._location + ".arff"):
-            print("update file")
             relation_data_file = arff.load(open(self._location + ".arff", 'r'))
             relation_data = relation_data_file['data']
 
@@ -410,9 +439,21 @@ class Relation:
             for tuple in relation_data:
                 attributes = []
                 for i in range(0, len(tuple)):
-                    if self._attributes[i]['name'] == self._primary_key:
+                    if self._primary_key.find("+") == -1 and self._attributes[i]['name'] == self._primary_key:
                         primary_key = tuple[i]
                     attributes.append({'attribute': self._attributes[i]['name'], 'value': tuple[i]})
+                if self._primary_key.find("+") != -1:
+                    primary_abutes = self._primary_key.split("+")
+                    primary_key = ""
+                    j = 0
+                    for abute in primary_abutes:
+                        j += 1
+                        for i in range(0, len(tuple)):
+                            if self._attributes[i]['name'] == abute:
+                                primary_key += str(tuple[i])
+                                if j != len(primary_abutes):
+                                    primary_key += "+"
+                    # primary_key = ""
                 self._data[primary_key] = Tuple(primary_key, self._attributes, attributes)
 
     def _set_attribute_row_counts(self, attribute_counts):
@@ -454,7 +495,6 @@ class Relation:
         relation_data = []
 
         if os.path.isfile(self._location + ".arff"):
-            print("update file")
             relation_data_file = arff.load(open(self._location + ".arff", 'r'))
             relation_data = relation_data_file['data']
 
@@ -492,6 +532,9 @@ class Relation:
     def insert_values(self, attributes):
         primary_key = ""
 
+        if not set([x['attribute'] for x in attributes]).issubset([y['name'] for y in self._attributes]):
+            raise SQLInputError("At least one of the supplied attributes is not in the relation")
+
         for abute in attributes:
             domain_of_abute = self._domains[abute['attribute']]
             if domain_of_abute == 'integer':
@@ -499,22 +542,35 @@ class Relation:
             elif domain_of_abute == "float":
                 abute['value'] = str(float(abute['value']))
 
-        for abute in attributes:
-            if abute['attribute'] == self._primary_key:
-                primary_key = abute['value']
+        if self._primary_key.find("+") == -1:
+            for abute in attributes:
+                if abute['attribute'] == self._primary_key:
+                    primary_key = abute['value']
+        else:
+            primary_abutes = self._primary_key.split("+")
+            j = 0
+            for primary_abute in primary_abutes:
+                j += 1
+                found_primary_atribute = False
+                for abute in attributes:
+                    if abute['attribute'] == primary_abute:
+                        primary_key += abute['value']
+                        found_primary_atribute = True
+                        if j != len(primary_abutes):
+                            primary_key += "+"
+                if found_primary_atribute is False:
+                    raise SQLInputError("All attributes for the primary key have not been supplied")
 
         if primary_key == "":
-            print("Emty primary key error / no primary key error")
-            raise Error
+            raise SQLInputError("No primary key inserted into the relation")
 
         if primary_key in self._data.keys():
-            print("Duplicate primary key error:")
-            raise Error
+            raise SQLInputError("A tuple already exists with the supplied primary key")
 
         new_tuple = Tuple(primary_key, self._attributes, attributes)
         self._data[primary_key] = new_tuple
 
-        # TODO: non-master relations may need to be able to add indexes
+
         if self._master_relation:
             for abute in attributes:
                 attribute = abute['attribute']

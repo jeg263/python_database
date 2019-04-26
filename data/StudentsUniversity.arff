@@ -1,0 +1,10 @@
+@RELATION StudentsUniversity
+
+@ATTRIBUTE year STRING
+@ATTRIBUTE studentID STRING
+@ATTRIBUTE universityID STRING
+
+@DATA
+2016,1,1
+2016,2,2
+?,3,3

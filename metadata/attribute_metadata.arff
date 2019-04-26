@@ -5,24 +5,20 @@
 @ATTRIBUTE domain_type STRING
 
 @DATA
-students,student_id,string
-students,full_name,string
-students,phone_number,string
-students,age,integer
-students,university,string
-universities,university_id,string
-universities,city,string
+Students,id,integer
+Students,name,string
+Students,email,string
+University,id,integer
+University,name,string
+University,city,string
+StudentsUniversity,year,integer
+StudentsUniversity,studentID,integer
+StudentsUniversity,universityID,integer
 A,id,integer
 A,value,integer
 B,id,integer
 B,value,integer
-B,value2,integer
-B,value3,integer
 C,id,integer
 C,value,integer
 D,id,integer
 D,value,integer
-Course,id,string
-Course,professor,string
-Course,year,string
-Course,student_id,string

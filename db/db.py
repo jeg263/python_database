@@ -4,25 +4,6 @@ from .index import Index, IndexSet
 import os
 from .errors import *
 
-# TODO: Delete - fix referential integrity + handle deleting indexes
-# TODO: Update - fix referential integrity
-
-# TODO: Drop table
-# TODO: Drop index
-# TODO: Drop attributes
-
-# TODO: Aggregation functions
-
-# TODO: Multiple attribute primary keys and foreign keys (hardest)
-# TODO: Project - projecting primary keys, when it removes duplicates
-
-# TODO: add index after data has been placed in relation
-# TODO: Build test cases
-# TODO: Documentation
-# TODO: verify that input supplied is actually the type said
-# TODO: Simple optimization
-#       Ordering join statements
-
 
 class DB:
     def __init__(self):
@@ -32,6 +13,31 @@ class DB:
 
         self._load_indexes()
         self._load_data()
+        self._load_fks()
+
+    def _refresh(self):
+        self._md = Metadata()
+        self._schemas = self._md.get_relations()
+        self._relations = {}
+
+        self._load_indexes()
+        self._load_data()
+        self._load_fks()
+
+    def drop_foreign_key(self, relation, attribute):
+        self._md.delete_fk(relation, attribute)
+
+    def drop_index(self, name):
+        self._md.delete_index(name)
+        if os.path.isfile("./index/" + name + ".csv"):
+            os.remove("./index/" + name + ".csv")
+
+    def drop_table(self, relation):
+        if relation not in self._relations.keys():
+            raise SQLInputError("Relation does not exist")
+        self._md.delete_relation(relation)
+        relation = self._relations.pop(relation)
+        relation.drop(self)
 
     # relation is a relation object
     # tuples is an array of attribute arrays, so takes the form:
@@ -40,6 +46,8 @@ class DB:
     def insert_tuples(self, relation, tuples):
         for tup in tuples:
             self.insert_tuple(relation, tup)
+        self._refresh()
+        return relation
 
     # left_relation - relation object, left relation when saying:
     # FROM relation_left, relation_right WHERE relation_left.x = relation_right.y
@@ -56,10 +64,10 @@ class DB:
     # Example (to join relation C with itself on the value attribute and update the indexes):
     # c = db.select("C")
     # db.join(c, c, ["value"], ["value"], "operation")
-    def join(self, left_relation, right_relation, left_on, right_on, operation="=", update_indexes=True):
+    def join(self, left_relation, right_relation, left_on, right_on, operations=["="], update_indexes=True):
         if len(left_on) != len(right_on):
             raise SQLInputError("The number of join conditions on the left and right sides must equal one another")
-        return left_relation.join(self, right_relation, left_on, right_on, update_indexes, operation)
+        return left_relation.join(self, right_relation, left_on, right_on, update_indexes, operations)
 
     # relation - this can either be a string or relation object. If it is a string it will find a saved relation
     # with the name provided. If it is a relation object it will perform the selection on that object
@@ -80,6 +88,10 @@ class DB:
         if where is None or len(where) == 0:
             return relation
 
+        for abute in where:
+            if abute['attribute'].find("right_side_") != -1 and abute['attribute'] not in relation._attribute_row_counts.keys():
+                abute['attribute'] = abute['attribute'][len("right_side_"):]
+
         combo_select_attributes = relation.check_for_combo_select(where)
         where = combo_select_attributes + where
 
@@ -99,17 +111,30 @@ class DB:
         else:
             return self.select(selected_relation, where)
 
-    def project(self, relation, attributes, as_attributes=None, deepcopy=False):
-        return relation.project(attributes, as_attributes, deepcopy)
+    def project(self, relation, attributes, as_attributes=None, deepcopy=False, lose_rhs= False):
+        return relation.project(attributes, as_attributes, deepcopy, lose_rhs=lose_rhs)
 
-    # TODO: test to make sure you don't update a foreign key someone depends upon
-    # The other main thing I have to do though is check for referential integrity before and after
-    # I also need to verify that none of the new values will cause problems before I delete
     def update(self, relation, values, where):
-        # TODO: if you update a primary key a lot of indexes need to change
-        # TODO: if you update a primary key it needs to not just change the tuples as currently
-        # TODO: need to have an override constrains variable for delete
         relations_to_update = self.select(relation, where)
+
+        for rel in self._fks.keys():
+            if relation.get_name() == rel:
+                attributes_with_fks = self._fks[rel]
+                for attribute in attributes_with_fks.keys():
+                    if attribute in set([x['attribute'] for x in values]):
+                        resulting_attributes = self.project(relations_to_update, [attribute], deepcopy=True)
+                        fk_values = resulting_attributes.get_attribute_value_array()
+                        fk_values = [x[0]['value'] for x in fk_values]
+
+                        fk_arrays = attributes_with_fks[attribute]
+                        for fk_relationship in fk_arrays:
+                            relation_to = fk_relationship[0]
+                            attribute_to = fk_relationship[1]
+                            for value in fk_values:
+                                fks_to_break_on = self.select(relation_to, [{"attribute": attribute_to, "value": value}])
+                                if len(fks_to_break_on) > 0:
+                                    raise SQLInputError("Foreign key constraint")
+
         tuples_to_update = len(relations_to_update)
         if tuples_to_update == 0:
             raise SQLInputError("No tuples to update with those parameters")
@@ -130,17 +155,31 @@ class DB:
         relations_to_update = relations_to_update.update_all(values)
         values_to_insert = relations_to_update.get_attribute_value_array()
 
-        self.delete(relation, where)
+        self.delete(relation, where, override_fk_constraints=True)
         for value in values_to_insert:
             self.insert_tuple(relation, value)
         return relation
 
-    # TODO: Needs to update the file
-    # TODO: referential integrity
-    def delete(self, relation, where):
-        # TODO: if you delete a tuple some indexes likely change
-
+    def delete(self, relation, where, override_fk_constraints=False):
         relation_to_remove = self.select(relation, where)
+        if not override_fk_constraints:
+            for rel in self._fks.keys():
+                if relation.get_name() == rel:
+                    attributes_with_fks = self._fks[rel]
+                    for attribute in attributes_with_fks.keys():
+                        resulting_attributes = self.project(relation_to_remove, [attribute], deepcopy=True)
+                        fk_values = resulting_attributes.get_attribute_value_array()
+                        fk_values = [x[0]['value'] for x in fk_values]
+
+                        fk_arrays = attributes_with_fks[attribute]
+                        for fk_relationship in fk_arrays:
+                            relation_to = fk_relationship[0]
+                            attribute_to = fk_relationship[1]
+                            for value in fk_values:
+                                fks_to_break_on = self.select(relation_to, [{"attribute": attribute_to, "value": value}])
+                                if len(fks_to_break_on) > 0:
+                                    raise SQLInputError("Foreign key constraint")
+
         return relation.delete(relation_to_remove)
 
     # relation is a relation object
@@ -149,28 +188,78 @@ class DB:
     #                 [{"attribute": "id", "value": 115}, {"attribute": "value", "value": 1},
     #                  {"attribute": "value2", 13: str(j)}, {"attribute": "value3", "value": 15}])
     def insert_tuple(self, relation, values):
-        relation.insert_values(values)
+        simple_fks = self._md.get_simple_fks()
+        for fk in simple_fks:
+            loc_relation = fk[3]
+            attribute = fk[2]
+            relation_abute = fk[1]
+            for v in values:
+                if v['attribute'] == relation_abute:
+                    resulting_fks = self.select(loc_relation, [{'attribute': attribute, "value": v['value'], "operation": "="}])
+                    if len(resulting_fks) == 0:
+                        raise SQLInputError("Cannot insert foreign keys until those keys are created")
+
+                # attributes_with_fks = self._fks[rel]
+                # for attribute in attributes_with_fks.keys():
+                #     resulting_attributes = self.project(relation_to_remove, [attribute], deepcopy=True)
+                #     fk_values = resulting_attributes.get_attribute_value_array()
+                #     fk_values = [x[0]['value'] for x in fk_values]
+                #
+                #     fk_arrays = attributes_with_fks[attribute]
+                #     for fk_relationship in fk_arrays:
+                #         relation_to = fk_relationship[0]
+                #         attribute_to = fk_relationship[1]
+                #         for value in fk_values:
+                #             fks_to_break_on = self.select(relation_to, [{"attribute": attribute_to, "value": value}])
+                #             if len(fks_to_break_on) > 0:
+                #                 raise SQLInputError("Foreign key constraint")
+        return relation.insert_values(values)
 
     # relation is a string with the name of the relation
     # each other variable is an array of what it is named, e.g.:
     # db.create_indexes("A", ["value"], ["type"], ["A_value_index"])
-    # TODO: The database needs to index all the data if an index is new but data already exists
-    # TODO: Also will need to add index to indexes array
     def create_indexes(self, relation, attribute_arrays, type_arrays, names):
         self._md.add_indexes(relation, names, type_arrays, attribute_arrays)
+        print("Index(es) created")
+        self._refresh()
 
     # Pretty self explanatory - look at the example
     # db.create_table("B", "id", "string", ["value", "value2", "value3"],
     #                 ["string", "string", "string"])
-    def create_table(self, relation, primary_key, primary_key_domain, other_attributes, other_domains):
+    def create_table(self, relation, primary_keys, primary_key_domain, other_attributes, other_domains):
+        primary_key = ""
+        if len(primary_keys) == 1:
+            primary_key = primary_keys[0]
+            primary_key_domain = primary_key_domain[0]
+        else:
+            i = 0
+            for abute in primary_keys:
+                i += 1
+                primary_key += abute
+                if i != len(primary_keys):
+                    primary_key += "+"
+            other_attributes += primary_keys
+            other_domains += primary_key_domain
+
         self._md.add_relation(relation, primary_key, primary_key_domain)
         self._md.add_attributes(relation, other_attributes, other_domains)
+        if primary_key.find("+") != -1:
+            type_array = []
+            for i in range(0, len(primary_keys)):
+                type_array.append("type")
+            self.create_indexes(relation, [primary_keys], [type_array],
+                                ["index_" + relation + "_" + primary_key + "_primary_key"])
+
+        self._refresh()
 
     # FK
     # db.create_fks("A", ["value"], ["B"], ["id"])
     def create_fks(self, relation, attributes, foreign_keys, foreign_key_tables):
         # TODO: handle new fks when data already exists
         self._md.add_foreign_keys(relation, attributes, foreign_keys, foreign_key_tables)
+
+    def _load_fks(self):
+        self._fks = self._md.get_fks()
 
     # This will load all the indexes in the files into memory -
     # it determines what indexes need to be loaded based on the metadata
@@ -193,3 +282,23 @@ class DB:
     def _load_data(self):
         for relation in self._schemas.keys():
             self._relations[relation] = Relation(self._schemas[relation], relation, self._indexes[relation], True)
+
+
+class DBParser(DB):
+    def __init__(self):
+        DB.__init__(self)
+
+    def insert(self, relation, attributes, values):
+        if len(attributes) != len(values):
+            raise SQLInputError("The number of values must equal the number of attributes provided")
+
+        insert_array = []
+        for i in range(0, len(attributes)):
+            insert_array.append({"attribute": attributes[i], "value": values[i]})
+
+        relation = relation[0]
+
+        result = self.insert_tuples(self.select(relation), [insert_array])
+        print("Tuple(s) inserted into relation")
+        return result
+

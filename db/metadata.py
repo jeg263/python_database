@@ -23,6 +23,22 @@ class Metadata:
         self._build_relations_info()
         return self._relations
 
+    def get_simple_fks(self):
+        return self._foreign_key_md
+
+    def get_fks(self):
+        mapped_fks = set(map(lambda x: x[3], self._foreign_key_md))
+        grouped_fks = [[y for y in self._foreign_key_md if y[3] == x] for x in mapped_fks]
+        meta_data_fks = {}
+        for fk in grouped_fks:
+            mapped_attribute_fks = set(map(lambda x: x[2], fk))
+            grouped_fks_attributes = [[y for y in fk if y[2] == x] for x in mapped_attribute_fks]
+            meta_data_fks_attributes = {}
+            for fk_attribute in grouped_fks_attributes:
+                meta_data_fks_attributes[fk_attribute[0][2]] = fk_attribute
+            meta_data_fks[fk[0][3]] = meta_data_fks_attributes
+        return meta_data_fks
+
     def get_indexes(self):
         maped_indexes = set(map(lambda x: x[0], self._index_md))
         grouped_indexes = [[y for y in self._index_md if y[0] == x] for x in maped_indexes]
@@ -160,12 +176,13 @@ class Metadata:
         existing_relations = [rel for rel in self._relation_md if rel[0] == relation_name]
 
         if len(existing_relations) > 0:
-            raise DuplicateRelation
+            raise SQLInputError("Duplicate relation error")
 
         self._relation_md.append([relation_name, "./data/" + relation_name, primary_key])
         self._save_relation_metadata()
-        self.add_attributes(relation_name, [primary_key], [primary_key_domain_type])
-        self.add_indexes(relation_name, ["index_" + relation_name + "_" + primary_key + "_primary_key"], [["type"]],
+        if primary_key.find("+") == -1:
+            self.add_attributes(relation_name, [primary_key], [primary_key_domain_type])
+            self.add_indexes(relation_name, ["index_" + relation_name + "_" + primary_key + "_primary_key"], [["type"]],
                          [[primary_key]])
 
     def add_attributes(self, relation_name, attribute_names, domain_types):
@@ -203,21 +220,25 @@ class Metadata:
         self._save_relation_metadata()
 
     def delete_attributes(self, relation, attribute):
-        indexes = [ix for ix in self._index_md if
-                        ((relation is not None and ix[1] == relation and ix[3] == attribute) or
-                                      (attribute is None and ix[1] == relation))]
+        # indexes = [ix for ix in self._index_md if
+        #                 ((relation is not None and ix[1] == relation and ix[3] == attribute) or
+        #                               (attribute is None and ix[1] == relation))]
+
+        # foreign_keys = [fk for fk in self._foreign_key_md if
+        #                 ((relation is not None and fk[0] == relation and fk[1] == attribute) or
+        #                               (attribute is None and fk[0] == relation) or
+        #                  (relation is not None and fk[3] == relation and fk[2] == attribute) or
+        #                               (attribute is None and fk[3] == relation))]
 
         foreign_keys = [fk for fk in self._foreign_key_md if
-                        ((relation is not None and fk[0] == relation and fk[1] == attribute) or
-                                      (attribute is None and fk[0] == relation) or
-                         (relation is not None and fk[3] == relation and fk[2] == attribute) or
-                                      (attribute is None and fk[3] == relation))]
+                        ((relation is not None and fk[3] == relation and fk[2] == attribute) or
+                         (attribute is None and fk[3] == relation))]
 
         if len(foreign_keys) > 0:
-            raise ForeignKeyError
+            raise SQLInputError("Foreign key constraint")
 
-        if len(indexes) > 0:
-            raise IndexesError
+        # if len(indexes) > 0:
+        #     raise IndexesError
 
         self._attribute_md = [abute for abute in self._attribute_md
                               if not ((attribute is not None and abute[0] == relation and abute[1] == attribute) or
@@ -241,7 +262,7 @@ class Metadata:
         #                                              indexes[3] == index_attributes)]
 
         if len(existing_indexes) > 0:
-            raise DuplicateIndex
+            raise SQLInputError("Duplicate index error")
 
     def _add_index(self, index_name, relation_name, index_types, index_attributes):
         if len(index_types) != len(index_attributes):
@@ -254,7 +275,7 @@ class Metadata:
                         fk[0] == relation and fk[1] == attribute]
 
         if len(existing_fks) > 0:
-            raise DuplicateFK
+            raise SQLInputError("Duplicate foreign key error")
 
     def _add_foreign_key(self, relation, attribute, foreign_key, foreign_key_table):
         self._foreign_key_md.append([relation, attribute, foreign_key, foreign_key_table])

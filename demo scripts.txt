@@ -1,0 +1,38 @@
+SELECT * FROM A
+SELECT * FROM B WHERE value > 500
+SELECT * FROM C WHERE value != 1
+SELECT * FROM C
+
+SELECT * FROM C INNER JOIN C ON C.value = C.value
+SELECT C.id AS "id", C.value, D.id AS "newID" FROM C INNER JOIN D ON C.value = D.value
+SELECT * FROM D INNER JOIN D ON D.value = D.value
+SELECT * FROM D INNER JOIN D ON D.value = D.value WHERE D.id < 10 - this optimizes and is fast
+
+
+
+CREATE TABLE Students (id int, first_name string, last_name string, gpa float, email string, PRIMARY KEY (id));
+CREATE TABLE University (id int, name string, city string, PRIMARY KEY (id));
+CREATE TABLE StudentsUniversity (studentID int, universityID int, year int, PRIMARY KEY (studentID, universityID), FOREIGN KEY (studentID) REFERENCES Students(id), FOREIGN KEY (universityID) REFERENCES University(id));
+CREATE INDEX StudentsUniversityStudentIDIndex ON StudentsUniversity (studentID);
+CREATE INDEX StudentsUniversityUniversityIDIndex ON StudentsUniversity (universityID);
+INSERT INTO Students (id, first_name, last_name, gpa, email) values (10, “John”, “Doe”, 3.7, “jeg263@georgetown.edu”)
+SELECT * FROM Students
+INSERT INTO StudentsUniversity (studentID, universityID, year) values (1, 1, 2016) - should throw an error
+INSERT INTO University (id, name, city) values (1, “Georgetown”, “Washington DC”)
+INSERT INTO StudentsUniversity (studentID, universityID, year) values (1, 1, 2016) - now it should work
+DELETE FROM University WHERE id = 1 - should cause an error
+DELETE FROM StudentsUniversity WHERE studentID = 1
+DELETE FROM University WHERE id = 1 - now it should work
+
+
+
+SELECT * FROM Q WHERE value = > 50;
+DROP INDEX index_name;
+SELECT * FROM Q WHERE value = > 50;
+DROP TABLE Q;
+SELECT * FROM Q;
+
+
+DELETE FROM Z WHERE value > 90
+UPDATE Z SET value = 10 WHERE id = 89;
+UPDATE Z SET value = 500 WHERE id > 50;

@@ -119,6 +119,24 @@ class Index:
             self._location = "./index/" + name + ".csv"
             self._load_index()
 
+    def get_name(self):
+        return self.name
+
+    def remove_pks_from_index(self, pks):
+        indexes_to_delete = []
+        for k,v in self._data.items():
+            pks_to_remove = set(pks).intersection(set(v))
+            if len(list(pks_to_remove)) > 0:
+                # print("taking out index")
+                remaining_indexes = list(set(v).difference(pks_to_remove))
+                self._data[k] = remaining_indexes
+                if len(remaining_indexes) == 0:
+                    indexes_to_delete.append(k)
+
+        for k in indexes_to_delete:
+            self._data.pop(k)
+        self.serialize_index()
+
     def update_attribute_name(self, new_name):
         self.attribute = new_name
 
@@ -188,6 +206,14 @@ class Index:
                 self._data[key] = current_locations
             else:
                 self._data[key] = [loc]
+
+    def serialize_index(self):
+        f = open(self._location, "w")
+
+        for k, v in self._data.items():
+            s = str(k) + "," + ",".join(v) + "\n"
+            f.write(s)
+        # print("s")
 
     def _add_index_from_file(self, key, loc):
         self._load_index()
